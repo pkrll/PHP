@@ -292,24 +292,4 @@ class Image {
 
 }
 
-if (!empty($_FILES)) {
-	$file = $_FILES['file']['tmp_name'];
-	
-	$path = "../../git/test/" . $_FILES['file']['name'];
-	$image = new Image($file);
-	$image->resize (560, 0, 2);
-	$image->save ($path);
-
-	$path = "../../git/test/crop-" . $_FILES['file']['name'];
-	$image->resize (150, 150, 4);
-	$image->crop(150,150);
-	$image->save ($path);
-	$image->cleanUp();
-}
-
 ?>
-
-<form id="article" action="Image.class.php" method="post" enctype="multipart/form-data">
-	<input type="file" name="file" />
-	<input type="submit">
-</form>
