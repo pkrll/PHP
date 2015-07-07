@@ -2,15 +2,16 @@
 /**
  * Image Class
  * Resize and crop images
+ * @author Ardalan Samimi
 */
 
 class Image {
-	
+
 	const IM_SIZE_EXACT = 1;
 	const IM_SIZE_WIDTH = 2;
 	const IM_SIZE_HEIGHT = 3;
 	const IM_SIZE_CROP = 4;
-	
+
 	/**
 	 * @access private
 	 * @var resource
@@ -28,31 +29,37 @@ class Image {
 	 * @var integer
 	 */
 	private $sourceHeight;
-	
+
 	/**
 	 * @access private
 	 * @var resource
 	 */
 	private $targetImage;
-	
+
 	/**
 	 * @access private
 	 * @var integer
 	 */
 	private $targetWidth;
-	
+
 	/**
 	 * @access private
 	 * @var integer
 	 */
 	private $targetHeight;
-	
+
 	/**
 	 * @access private
 	 * @var integer
 	 */
 	private $fileExtension;
-	
+
+	/**
+	 * @access private
+	 * @var string
+	 */
+	private $errorMessage;
+
 	/**
 	 * Initialize the Image Class.
 	 * Variable $file is the string path
@@ -68,9 +75,9 @@ class Image {
 			return NULL;
 		$this->setSourceImage ($file);
 		if ($width !== NULL && $height !== NULL)
-			$this->resize ($width, $height, $option);	
+			$this->resize ($width, $height, $option);
 	}
-	
+
 	/**
 	 * Free memory associated
 	 * with the created images.
@@ -80,9 +87,17 @@ class Image {
 		imagedestroy($this->targetImage);
 		imagedestroy($this->sourceImage);
 	}
-	
+
+	private function throwError ($message) {
+		$this->errorMessage = $message;
+	}
+
+	public function getErrorMessage () {
+		return $this->errorMessage;
+	}
+
 	/**
-	 * Resizes the image to the 
+	 * Resizes the image to the
 	 * requested dimensions.
 	 *
 	 * @param integer $width
@@ -103,8 +118,10 @@ class Image {
 			$this->setSize ($width, $height);
 		// Create the resource for the resized image
 		$this->setTargetImage();
+		if ($option === self::IM_SIZE_CROP)
+			$this->crop ($width, $height);
 	}
-	
+
 	/**
 	 * Save the resized image.
 	 *
@@ -126,7 +143,7 @@ class Image {
 
 		return TRUE;
 	}
-	
+
 	/**
 	 * Creates the original (source) image
 	 * out of the inputed image file.
@@ -136,19 +153,22 @@ class Image {
 	private function setSourceImage ($file) {
 		// Retrieve the width, height and type of
 		// of the selected image with getimagesize().
-		list($this->sourceWidth, $this->sourceHeight, $this->fileExtension) = getimagesize($file);
-		// Create the source image from the file,
-		// based on its extension.
-		if ($this->fileExtension === IMAGETYPE_JPEG)
-			$this->sourceImage = imagecreatefromjpeg($file);
-		else if ($this->fileExtension === IMAGETYPE_PNG)
-			$this->sourceImage = imagecreatefrompng($file);
-		else if ($this->fileExtension === IMAGETYPE_GIF)
-			$this->sourceImage = imagecreatefromgif($file);
-		else
-			$this->throwError("File is not an image");
+		if (list($this->sourceWidth, $this->sourceHeight, $this->fileExtension) = @getimagesize($file)) {
+			// Create the source image from the file,
+			// based on its extension.
+			if ($this->fileExtension === IMAGETYPE_JPEG)
+				$this->sourceImage = $this->imageCreateFromJpeg($file);
+			else if ($this->fileExtension === IMAGETYPE_PNG)
+				$this->sourceImage = $this->imageCreateFromPng($file);
+			else if ($this->fileExtension === IMAGETYPE_GIF)
+				$this->sourceImage = $this->imageCreateFromGif($file);
+			else
+				throw new Exception ("File is not an image");
+		} else {
+			throw new Exception ("File is not an image");
+		}
 	}
-	
+
 	/**
 	 * Create the new (target) image with
 	 * the user requested dimensions.
@@ -158,7 +178,7 @@ class Image {
 		$this->targetImage = imagecreatetruecolor($this->targetWidth, $this->targetHeight);
 		imagecopyresampled($this->targetImage, $this->sourceImage, 0, 0, 0, 0, $this->targetWidth, $this->targetHeight, $this->sourceWidth, $this->sourceHeight);
 	}
-	
+
 	/**
 	 * Set the new size with the,
 	 * the exact dimensions.
@@ -170,9 +190,9 @@ class Image {
 		$this->targetWidth = $width;
 		$this->targetHeight = $height;
 	}
-	
+
 	/**
-	 * Set the new size with an exact width, 
+	 * Set the new size with an exact width,
 	 * but adjusted height. If the new width
 	 * is larger, then it should use the old
 	 * width, instead of embiggen the image.
@@ -186,9 +206,9 @@ class Image {
 			$this->targetWidth = $this->sourceWidth;
 		$this->targetHeight = $this->getHeightByWidth ($this->targetWidth);
 	}
-	
+
 	/**
-	 * Set the new size with an exact height, 
+	 * Set the new size with an exact height,
 	 * but adjusted width. If the new height
 	 * is larger, then it should use the old
 	 * height, instead of embiggen the image.
@@ -199,11 +219,11 @@ class Image {
 		if ($this->sourceHeight > $height)
 			$this->targetHeight = $height;
 		else
-			$this->targetHeight = $this->sourceHeight;			
+			$this->targetHeight = $this->sourceHeight;
 		$this->targetWidth = $this->getWidthByHeight ($this->targetHeight);
 
 	}
-	
+
 	/**
 	 * Determine the optimal size for
 	 * the new image to be cropped.
@@ -227,7 +247,7 @@ class Image {
 			$this->targetHeight = $this->sourceHeight / $ratio["width"];
 		}
 	}
-	
+
 	/**
 	 * Set the new size automatically
 	 * based on the image dimensions.
@@ -248,7 +268,7 @@ class Image {
 			else
 				$this->setSizeExact ($width, $height);
 	}
-	
+
 	/**
 	 * Crop the target image with its
 	 * aspect ratio uncompromised.
@@ -256,7 +276,7 @@ class Image {
 	 * @param integer $width
 	 * @param integer $height
 	 */
-	public function crop ($width, $height) {
+	private function crop ($width, $height) {
 		// Calculate the X, Y coordinates
 		// to use for cropping the images.
 		$cropX = ($this->targetWidth - $width) / 2;
@@ -269,7 +289,7 @@ class Image {
 	    $this->targetImage = imagecreatetruecolor($width , $height);
 	    imagecopyresampled($this->targetImage, $cropImage, 0, 0, $cropX, $cropY, $width, $height , $width, $height);
 	}
-	
+
 	/**
 	 * Calculate height adjusted
 	 * to the fixed width.
@@ -279,7 +299,7 @@ class Image {
 	private function getHeightByWidth ($width) {
 		return floor(($this->sourceHeight / $this->sourceWidth) * $width);
 	}
-	
+
 	/**
 	 * Calculate width adjusted
 	 * to the fixed height.
@@ -288,6 +308,60 @@ class Image {
 	 */
 	private function getWidthByHeight ($height) {
 		return floor(($this->sourceWidth / $this->sourceHeight) * $height);
+	}
+
+	/**
+	 * Calls imagecreatefromjpeg function, but
+	 * not before it checks if it exists.
+	 * Implemented to make sure the php build
+	 * has JPEG/PNG/GIF support enabled.
+	 *
+	 * @param string $file
+	 * @return resource
+	 */
+	private function imageCreateFromJpeg ($file) {
+		if (function_exists('imagecreatefromjpeg')
+			&& is_callable('imagecreatefromjpeg')) {
+			return imagecreatefromjpeg($file);
+		} else {
+			throw new Exception ("No JPEG support");
+		}
+	}
+
+	/**
+	 * Calls imageCreateFromPng function, but
+	 * not before it checks if it exists.
+	 * Implemented to make sure the php build
+	 * has JPEG/PNG/GIF support enabled.
+	 *
+	 * @param string $file
+	 * @return resource
+	 */
+	private function imageCreateFromPng ($file) {
+		if (function_exists('imagecreatefrompng')
+			&& is_callable('imagecreatefrompng')) {
+			return imagecreatefrompng($file);
+		} else {
+			throw new Exception ("No PNG support");
+		}
+	}
+
+	/**
+	 * Calls imageCreateFromGif function, but
+	 * not before it checks if it exists.
+	 * Implemented to make sure the php build
+	 * has JPEG/PNG/GIF support enabled.
+	 *
+	 * @param string $file
+	 * @return resource
+	 */
+	private function imageCreateFromGif ($file) {
+		if (function_exists('imagecreatefromgif')
+			&& is_callable('imagecreatefromgif')) {
+			return imagecreatefromgif($file);
+		} else {
+			throw new Exception ("No GIF support");
+		}
 	}
 
 }
